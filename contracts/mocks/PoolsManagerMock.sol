@@ -42,6 +42,7 @@ contract VaultsManagerMock {
                                     isTokenLockRevocable: false,
                                     maxBounty: _maxBounty,
                                     bountySplit: _bountySplit,
+                                    governanceFee: type(uint16).max,
                                     vestingDuration: 86400,
                                     vestingPeriods: 10
                                 }));

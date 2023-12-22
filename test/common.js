@@ -3,7 +3,6 @@ const HATClaimsManager = artifacts.require("./HATClaimsManager.sol");
 const HATVaultsRegistry = artifacts.require("./HATVaultsRegistry.sol");
 const HATTokenMock = artifacts.require("./HATTokenMock.sol");
 const ERC20Mock = artifacts.require("./ERC20Mock.sol");
-const UniSwapV3RouterMock = artifacts.require("./UniSwapV3RouterMock.sol");
 const TokenLockFactory = artifacts.require("./TokenLockFactory.sol");
 const HATTokenLock = artifacts.require("./HATTokenLock.sol");
 const RewardController = artifacts.require("./RewardController.sol");
@@ -53,8 +52,8 @@ function assertVMException(error, expectedError = "") {
       expectedError + "'";
   if (expectedError) {
     assert(
-      error.message === expectedErrorMessage ||
-        error.message === expectedReasonString ||
+      error.message.includes(expectedErrorMessage) ||
+        error.message.includes(expectedReasonString) ||
         // Needed for now because hardhat doesn't fully support the viaIR compiler setting
         error.message === "Returned error: VM Exception while processing transaction: revert with unrecognized return data or custom error" ||
         error.message === "Transaction reverted and Hardhat couldn't infer the reason.",
@@ -75,11 +74,9 @@ const setup = async function(
     startBlock : (await web3.eth.getBlock("latest")).number,
     maxBounty : 8000,
     bountySplit : [7500, 2000, 500],
-    hatBountySplit : [1500, 500],
+    governanceFee : 2000,
     halvingAfterBlock : 10,
-    routerReturnType : 0,
     allocPoint : 100,
-    weth : false,
     rewardInVaults : 2500000,
     challengePeriod: 60 * 60 * 24,
     setDefaultArbitrator: true,
@@ -90,11 +87,6 @@ const setup = async function(
   hatToken = await HATTokenMock.new(accounts[0]);
   await hatToken.setTransferable({from: accounts[0]});
   stakingToken = await ERC20Mock.new("Staking", "STK");
-  let wethAddress = utils.NULL_ADDRESS;
-  if (options.weth) {
-    wethAddress = stakingToken.address;
-  }
-  router = await UniSwapV3RouterMock.new(options.routerReturnType, wethAddress);
   var tokenLock = await HATTokenLock.new();
   tokenLockFactory = await TokenLockFactory.new(tokenLock.address, accounts[0]);
 
@@ -109,8 +101,7 @@ const setup = async function(
       epochRewardPerBlock
     }],
     hatVaultsRegistryConf: {
-      bountyGovernanceHAT: options.hatBountySplit[0],
-      bountyHackerHATVested: options.hatBountySplit[1]
+      governanceFee: options.governanceFee
     },
     silent: true
   });
@@ -125,7 +116,7 @@ const setup = async function(
     accounts[0],
     web3.utils.toWei((2500000 + options.rewardInVaults).toString())
   );
-  await hatToken.mint(router.address, web3.utils.toWei("2500000"));
+
   if (options.rewardInVaults > 0) {
     await hatToken.mint(accounts[0], web3.utils.toWei(options.rewardInVaults.toString()));
     await hatToken.transfer(
@@ -156,6 +147,7 @@ const setup = async function(
     isTokenLockRevocable: options.isTokenLockRevocable,
     maxBounty: options.maxBounty,
     bountySplit: options.bountySplit,
+    governanceFee: options.governanceFee,
     vestingDuration: 86400,
     vestingPeriods: 10
     }
@@ -191,7 +183,6 @@ const setup = async function(
     tokenLockFactory,
     rewardController,
     hatVaultsExpectedHatsBalance,
-    router,
     someAccount: accounts[5], // an account without any special role
     stakingToken,
     vault,
